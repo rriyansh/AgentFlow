@@ -1,0 +1,4 @@
+{
+  "graph": "app.core.graph:build_graph",
+  "checkpointer": "app.core.checkpointer:BaseCheckpointer"
+}
