@@ -1,4 +1,5 @@
 import uuid
+import time
 from fastapi import APIRouter, Depends, HTTPException, Request
 from langchain_core.messages import HumanMessage
 from app.api.schemas import RunRequest, RunResponse
@@ -6,13 +7,12 @@ from app.security.auth import verify_api_key
 from app.api.rate_limit import limiter
 from app.core.graph import app as agent_app
 from app.observability.metrics import AGENT_RUNS, AGENT_LATENCY
-import time
 
 router = APIRouter(prefix="/v1/agent", tags=["agent"])
 
 
 @router.post("/run", response_model=RunResponse)
-@limiter.limit("10/minute")  # Stricter limit for expensive agent runs
+@limiter.limit("10/minute")
 async def run_agent(
     request: Request,
     payload: RunRequest,
@@ -33,7 +33,7 @@ async def run_agent(
         "token_usage": {},
     }
 
-    # Multi-tenant isolation: thread_id scoped to user
+    # Multi-tenant isolation: thread scoped to user
     config = {"configurable": {"thread_id": f"{payload.user_id}:{thread_id}"}}
 
     try:
@@ -50,3 +50,14 @@ async def run_agent(
     except Exception as exc:
         AGENT_RUNS.labels(status="error").inc()
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/state/{thread_id}")
+async def get_state(
+    thread_id: str,
+    user_id: str = "default",
+    _: str = Depends(verify_api_key),
+) -> dict:
+    config = {"configurable": {"thread_id": f"{user_id}:{thread_id}"}}
+    snapshot = agent_app.get_state(config)
+    return {"values": snapshot.values, "next": snapshot.next}
