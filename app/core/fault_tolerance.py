@@ -1,33 +1,30 @@
-# Retry policies & timeoutsfrom langgraph.types import RetryPolicy
-from langgraph.errors import NodeTimeoutError
+from langgraph.types import RetryPolicy, TimeoutPolicy
 from app.config import settings
 
 
 def get_retry_policy() -> RetryPolicy:
-    """Standard retry policy for transient failures (network, rate limits)."""
+    """Exponential backoff with jitter for transient failures."""
     return RetryPolicy(
         initial_interval=1.0,
         backoff_factor=2.0,
         max_interval=30.0,
         max_attempts=settings.max_retry_attempts,
         jitter=True,
-        retry_on=[
-            ConnectionError,
-            TimeoutError,
-            # OpenAI rate-limit errors can be added via exception type
-        ],
     )
 
 
-def get_node_timeout() -> float:
-    """Per-node timeout in seconds."""
-    return float(settings.node_timeout_seconds)
+def get_timeout_policy() -> TimeoutPolicy:
+    """Hard wall-clock cap per node attempt."""
+    return TimeoutPolicy(
+        run_timeout=settings.node_timeout_seconds,
+        idle_timeout=settings.node_timeout_seconds // 2,
+    )
 
 
 def handle_node_failure(state: dict, error: Exception) -> dict:
     """
-    Fallback error handler: records the failure and routes gracefully.
-    Called only after all retries are exhausted.
+    Fallback handler: runs only after all retries are exhausted.
+    Records failure and gracefully routes to END.
     """
     return {
         "review_status": "ERROR",
