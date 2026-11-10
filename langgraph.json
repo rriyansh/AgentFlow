@@ -1,0 +1,7 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "agentflow": "./app/core/graph.py:app"
+  },
+  "env": "./.env"
+}
