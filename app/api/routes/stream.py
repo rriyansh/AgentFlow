@@ -1,4 +1,4 @@
-# SSE streaming endpointimport json
+import json
 from fastapi import APIRouter, Depends
 from sse_starlette.sse import EventSourceResponse
 from langchain_core.messages import HumanMessage
@@ -13,9 +13,11 @@ router = APIRouter(prefix="/v1/agent", tags=["stream"])
 async def stream_agent(
     payload: RunRequest, _: str = Depends(verify_api_key)
 ):
-    """Stream node-level events to the client via Server-Sent Events."""
+    """Stream node-level events via Server-Sent Events."""
     thread_id = payload.thread_id or "stream-session"
-    config = {"configurable": {"thread_id": f"{payload.user_id}:{thread_id}"}}
+    config = {
+        "configurable": {"thread_id": f"{payload.user_id}:{thread_id}"}
+    }
 
     initial_state = {
         "messages": [HumanMessage(content=payload.task)],
@@ -34,13 +36,20 @@ async def stream_agent(
             initial_state, config=config, version="v2"
         ):
             kind = event["event"]
-            if kind == "on_chain_start" and event.get("name") in (
+            name = event.get("name", "")
+            if kind == "on_chain_start" and name in (
                 "researcher", "coder", "reviewer"
             ):
-                yield {"event": "node_start", "data": json.dumps({"node": event["name"]})}
-            elif kind == "on_chain_end" and event.get("name") in (
+                yield {
+                    "event": "node_start",
+                    "data": json.dumps({"node": name}),
+                }
+            elif kind == "on_chain_end" and name in (
                 "researcher", "coder", "reviewer"
             ):
-                yield {"event": "node_end", "data": json.dumps({"node": event["name"]})}
+                yield {
+                    "event": "node_end",
+                    "data": json.dumps({"node": name}),
+                }
 
     return EventSourceResponse(event_generator())
