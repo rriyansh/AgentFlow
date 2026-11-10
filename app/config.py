@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     db_pool_max_size: int = 10
 
     # Redis
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = "redis://redis:6379/0"
 
     # Tools
     tavily_api_key: str = ""
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     langsmith_tracing: bool = True
     langsmith_api_key: str = ""
     langsmith_project: str = "agentflow"
-    otel_exporter_otlp_endpoint: str = "http://localhost:4317"
+    otel_exporter_otlp_endpoint: str = "http://jaeger:4317"
     otel_service_name: str = "agentflow"
 
     # Security
