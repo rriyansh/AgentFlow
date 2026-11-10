@@ -6,7 +6,6 @@ from slowapi import _rate_limit_exceeded_handler
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from app import __version__
-from app.config import settings
 from app.observability.logging import setup_logging, logger
 from app.api.rate_limit import limiter
 from app.api.routes import health, agent, stream
@@ -24,14 +23,19 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AgentFlow API",
-    description="Enterprise multi-agent system with fault tolerance & HITL.",
+    description=(
+        "Enterprise multi-agent system with fault tolerance, "
+        "HITL support, rate limiting, and full observability."
+    ),
     version=__version__,
     lifespan=lifespan,
 )
 
 # Rate limiting
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(
+    RateLimitExceeded, _rate_limit_exceeded_handler
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,6 +45,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Auto-instrument FastAPI with OpenTelemetry
 FastAPIInstrumentor.instrument_app(app)
 
 app.include_router(health.router)
