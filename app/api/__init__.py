@@ -1,1 +1,1 @@
-"""FastAPI layer."""
+"""API layer."""
