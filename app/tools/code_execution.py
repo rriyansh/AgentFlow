@@ -1,18 +1,20 @@
+"""Sandboxed code execution tool."""
+import os
 import subprocess
 import tempfile
-import os
+
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 
 class CodeExecutionInput(BaseModel):
-    code: str = Field(description="Python code to execute")
-    timeout: int = Field(default=10, ge=1, le=30, description="Timeout in seconds")
+    code: str = Field(description="Python code")
+    timeout: int = Field(default=10, ge=1, le=30)
 
 
 @tool("execute_code", args_schema=CodeExecutionInput)
 def execute_code(code: str, timeout: int = 10) -> str:
-    """Execute Python code in an isolated subprocess and return stdout/stderr."""
+    """Execute Python in a sandboxed subprocess with strict env."""
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -20,7 +22,6 @@ def execute_code(code: str, timeout: int = 10) -> str:
         ) as f:
             f.write(code)
             tmp_path = f.name
-
         result = subprocess.run(
             ["python", "-I", "-S", tmp_path],
             capture_output=True,
