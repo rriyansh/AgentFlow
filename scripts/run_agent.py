@@ -1,9 +1,11 @@
-"""CLI script to run AgentFlow locally."""
+"""Interactive CLI runner."""
 import asyncio
 import uuid
+
 from langchain_core.messages import HumanMessage
+
 from app.core.graph import app
-from app.observability.logging import setup_logging, logger
+from app.observability.logging import logger, setup_logging
 
 
 async def main() -> None:
@@ -25,21 +27,14 @@ async def main() -> None:
         "user_id": "cli-user",
         "token_usage": {},
     }
-
-    logger.info("run_started", thread_id=thread_id, task=task)
+    logger.info("run_started", thread_id=thread_id)
     result = await app.ainvoke(
         state, config={"configurable": {"thread_id": thread_id}}
     )
-
     print("\n" + "=" * 60)
-    print("FINAL OUTPUT")
-    print("=" * 60)
     print(result["code_output"])
-    print("\n" + "=" * 60)
-    print(f"Status: {result['review_status']}")
-    print(f"Revisions: {result['revision_count']}")
-    print(f"Token usage: {result.get('token_usage')}")
     print("=" * 60)
+    print(f"Status: {result['review_status']} | Revisions: {result['revision_count']}")
 
 
 if __name__ == "__main__":
