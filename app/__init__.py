@@ -1,3 +1,2 @@
-"""AgentFlow — Autonomous Multi-Agent System."""
-
-__version__ = "3.0.0"
+"""AgentFlow — Enterprise Multi-Agent System."""
+__version__ = "4.0.0"
