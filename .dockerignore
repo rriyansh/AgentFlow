@@ -1,6 +1,8 @@
 .git
 .github
 .env
+.env.*
+!.env.example
 .venv
 venv
 __pycache__
@@ -14,3 +16,4 @@ coverage.xml
 tests/
 docs/
 README.md
+LICENSE
