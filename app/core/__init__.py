@@ -1,1 +1,1 @@
-"""Core graph orchestration."""
+"""Core orchestration layer."""
