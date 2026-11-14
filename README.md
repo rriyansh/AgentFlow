@@ -1,50 +1,57 @@
-# AgentFlow
+# <img src="https://cdn.simpleicons.org/langchain/1C3C3C" width="32" height="32" alt="LangGraph" /> AgentFlow v4
 
-**Autonomous Multi-Agent System for Complex Business Workflows**
+**Enterprise Multi-Agent System — Hardened, Observable, Production-Ready**
 
 [![CI](https://github.com/your-org/agentflow/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/agentflow/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/your-org/agentflow/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/agentflow)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
-[![LangGraph](https://img.shields.io/badge/orchestration-LangGraph-green.svg)](https://langchain-ai.github.io/langgraph/)
-
-AgentFlow is a **production-grade, stateful multi-agent system** built on top of LangGraph. It orchestrates a team of specialized AI agents — **Researcher**, **Coder**, and **Reviewer** — through a durable graph architecture to autonomously execute complex, multi-step business workflows without human intervention.
-
-Each agent is equipped with domain-specific tools, memory modules, and structured reasoning capabilities, collaborating via a **stateful graph** with automatic retries, timeouts, and graceful error recovery.
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg)](https://www.docker.com/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-1.4-1C3C3C.svg)](https://langchain-ai.github.io/langgraph/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1.svg)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D.svg)](https://redis.io/)
+[![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-instrumented-425CC7.svg)](https://opentelemetry.io/)
 
 ---
 
 ## Table of Contents
 
-1. [Why AgentFlow?](#why-agentflow)
-2. [Architecture](#architecture)
-3. [Features](#features)
-4. [Tech Stack](#tech-stack)
-5. [Project Structure](#project-structure)
-6. [Quick Start](#quick-start)
-7. [Configuration](#configuration)
-8. [API Documentation](#api-documentation)
-9. [Case Studies](#case-studies)
-10. [Observability](#observability)
-11. [Testing](#testing)
-12. [Deployment](#deployment)
-13. [Troubleshooting](#troubleshooting)
-14. [Contributing](#contributing)
-15. [License](#license)
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [API Reference](#api-reference)
+- [Security](#security)
+- [Observability](#observability)
+- [Testing](#testing)
+- [Docker Deployment](#docker-deployment)
+- [Production Deployment](#production-deployment)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## Why AgentFlow?
+## Overview
 
-Traditional single-agent LLM systems struggle with complex, multi-step tasks. They lose context, hallucinate, and have no quality control. AgentFlow solves this by treating **agents as specialized team members** working together:
+**AgentFlow v4** is a production-grade, autonomous multi-agent system that orchestrates a team of specialized AI agents — **Researcher**, **Coder**, and **Reviewer** — through a durable LangGraph state machine to execute complex, multi-step business workflows without human intervention.
 
-- **Researcher** gathers facts before coding begins (no hallucinated APIs).
-- **Coder** writes and *executes* code in a sandbox (no untested code).
-- **Reviewer** enforces quality gates with structured feedback (no silent failures).
-- **Fault tolerance** ensures the system self-heals from transient LLM/network errors.
-- **Durable state** means a workflow can resume from any checkpoint after a crash.
+Each agent is equipped with domain-specific tools, structured reasoning, and shared memory. The system self-heals from transient failures, exposes full observability, and ships with a hardened security posture (JWT + API key + rate limiting + audit trail).
 
-The result: **autonomous workflows that actually ship**.
+### Why AgentFlow?
+
+- **Autonomous workflows** — Agents plan, execute, review, and iterate without human touch
+- **Self-healing** — Per-node retries, timeouts, and graceful fallbacks
+- **Durable state** — PostgreSQL checkpointing enables crash recovery and resume
+- **Multi-tenant safe** — Thread isolation per user
+- **Fully observable** — OpenTelemetry traces, Prometheus metrics, structured logs, LangSmith LLM traces
+- **Security first** — Dual auth, rate limiting, request size caps, CORS allowlist, secret validation
 
 ---
 
@@ -52,47 +59,48 @@ The result: **autonomous workflows that actually ship**.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                     User / Client (HTTP)                     │
+│                     Client / HTTP Request                    │
 └───────────────────────────┬──────────────────────────────────┘
                             │
                             ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                   FastAPI + Rate Limiting                    │
-│        (API Key Auth · SSE Streaming · Prometheus)           │
+│                   FastAPI + Middleware Stack                 │
+│   (Request ID · Body Limit · CORS · Rate Limit · Auth)       │
 └───────────────────────────┬──────────────────────────────────┘
                             │
                             ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                    LangGraph StateGraph                      │
-│  ┌──────────────┐    ┌─────────┐    ┌──────────┐             │
-│  │  Researcher  │───▶│  Coder  │───▶│ Reviewer │             │
-│  │ (web_search) │    │(execute)│    │(structured)│           │
-│  └──────────────┘    └─────────┘    └──────────┘             │
-│        ▲                  │               │                  │
-│        │                  │   NEEDS_REVISION                  │
-│        │                  └───────────────┘                  │
-│        │                             │ APPROVED              │
-│        │                             ▼                       │
-│        │                            END                       │
-│        │                                                     │
-│        └─── PostgresSaver (Durable Checkpointer)             │
+│                                                              │
+│   ┌──────────────┐   ┌─────────┐   ┌──────────┐              │
+│   │  Researcher  │──▶│  Coder  │──▶│ Reviewer │              │
+│   │ (web_search) │   │(execute)│   │(structured)│            │
+│   └──────────────┘   └─────────┘   └──────────┘              │
+│          ▲               │               │                   │
+│          │               │   NEEDS_REVISION                  │
+│          │               └───────────────┘                   │
+│          │                            │ APPROVED             │
+│          │                            ▼                      │
+│          │                           END                     │
+│          │                                                   │
+│          └── PostgresSaver (durable checkpointer)            │
 └───────────────────────────┬──────────────────────────────────┘
                             │
         ┌───────────────────┼───────────────────┐
         ▼                   ▼                   ▼
    PostgreSQL           Redis              Jaeger / OTel
-  (state store)    (rate limiting)      (distributed traces)
+  (state + audit)   (rate limiting)     (distributed traces)
 ```
 
-### Flow
+### Workflow Flow
 
-1. **Researcher** receives the task and gathers current information via Tavily web search.
-2. **Coder** uses the research findings to write production-quality code, then executes it in a sandboxed subprocess to verify correctness.
-3. **Reviewer** audits the code against quality, security, and correctness criteria. It returns a structured `APPROVED` or `NEEDS_REVISION` decision with specific feedback.
-4. If `NEEDS_REVISION`, the graph **loops back to the Coder** with the feedback (bounded by `MAX_REVISIONS`).
-5. If `APPROVED`, the workflow terminates and returns the final artifact.
+1. **Researcher** receives the task, performs web search, returns structured findings.
+2. **Coder** uses the findings to write production-quality code and verifies it via sandboxed execution.
+3. **Reviewer** audits the code with structured output (`APPROVED` or `NEEDS_REVISION` + feedback).
+4. On `NEEDS_REVISION`, the graph loops back to **Coder** (bounded by `MAX_REVISIONS`).
+5. On `APPROVED`, the workflow completes and returns the final artifact.
 
-Every node has **retries, timeouts, and an error handler** — so transient failures don't kill the entire workflow.
+Every node has **retries**, **timeouts**, and an **error handler** — transient failures don't kill the workflow.
 
 ---
 
@@ -100,34 +108,56 @@ Every node has **retries, timeouts, and an error handler** — so transient fail
 
 | Capability | Implementation |
 |---|---|
-| **Self-Healing** | Per-node `RetryPolicy` with exponential backoff + jitter |
-| **Never Hangs** | Hard `TimeoutPolicy` per node attempt |
-| **Graceful Degradation** | `error_handler` runs after retries are exhausted |
-| **Durable State** | PostgreSQL `PostgresSaver` with connection pooling |
-| **Multi-Tenant Safe** | `thread_id` scoped per `user_id`; no cross-tenant leakage |
-| **Secure by Default** | API key authentication + Redis-backed rate limiting |
-| **Full Observability** | OpenTelemetry spans + LangSmith traces + Prometheus metrics |
-| **Real-Time UX** | Server-Sent Events via `astream_events(version="v2")` |
-| **HITL Ready** | `interrupt()` + `Command(resume=...)` pattern supported |
-| **Structured Logging** | `structlog` with JSON rendering for log aggregation |
-| **Production Docker** | Multi-stage build, non-root user, healthchecks |
-| **Comprehensive Tests** | Graph routing, node logic, API auth, fault tolerance |
+| Self-Healing | Per-node `RetryPolicy` with exponential backoff + jitter |
+| Never Hangs | `TimeoutPolicy` per node attempt |
+| Graceful Degradation | `error_handler` runs after retries exhausted |
+| Durable State | PostgreSQL `PostgresSaver` with connection pooling |
+| Multi-Tenant Safe | `thread_id` scoped per `user_id` |
+| Dual Authentication | API key (`x-api-key`) + JWT Bearer |
+| JWT Revocation | Redis-backed JTI blacklist |
+| Distributed Rate Limiting | SlowAPI + Redis (moving window, user-aware) |
+| Request Body Limit | Middleware-enforced (default 1 MB) |
+| CORS Allowlist | Config-driven; wildcard rejected in production |
+| Secret Validation | `Settings` fails fast on weak secrets in production |
+| Audit Trail | `workflow_runs` table with duration + revisions |
+| Real-Time Streaming | Server-Sent Events via `astream_events(v2)` |
+| Full Observability | OpenTelemetry + Prometheus + structlog + LangSmith |
+| Structured Errors | `ErrorEnvelope` with request ID correlation |
+| Production Docker | Multi-stage, non-root user, healthchecks |
+| Comprehensive Tests | Graph, API, auth, fault tolerance, errors |
 
 ---
 
 ## Tech Stack
 
+<p align="left">
+  <img src="https://cdn.simpleicons.org/python/3776AB" width="40" height="40" alt="Python" />
+  <img src="https://cdn.simpleicons.org/fastapi/009688" width="40" height="40" alt="FastAPI" />
+  <img src="https://cdn.simpleicons.org/langchain/1C3C3C" width="40" height="40" alt="LangChain" />
+  <img src="https://cdn.simpleicons.org/openai/412991" width="40" height="40" alt="OpenAI" />
+  <img src="https://cdn.simpleicons.org/postgresql/4169E1" width="40" height="40" alt="PostgreSQL" />
+  <img src="https://cdn.simpleicons.org/redis/DC382D" width="40" height="40" alt="Redis" />
+  <img src="https://cdn.simpleicons.org/docker/2496ED" width="40" height="40" alt="Docker" />
+  <img src="https://cdn.simpleicons.org/opentelemetry/425CC7" width="40" height="40" alt="OpenTelemetry" />
+  <img src="https://cdn.simpleicons.org/prometheus/E6522C" width="40" height="40" alt="Prometheus" />
+  <img src="https://cdn.simpleicons.org/githubactions/2088FF" width="40" height="40" alt="GitHub Actions" />
+  <img src="https://cdn.simpleicons.org/pydantic/E92063" width="40" height="40" alt="Pydantic" />
+</p>
+
 | Layer | Technology |
 |---|---|
 | **Orchestration** | LangGraph (`StateGraph`, `RetryPolicy`, `TimeoutPolicy`) |
 | **LLM** | OpenAI GPT-4o via LangChain |
-| **API** | FastAPI + Uvicorn |
-| **Persistence** | PostgreSQL (`PostgresSaver`) |
-| **Rate Limiting** | SlowAPI + Redis (sliding window) |
-| **Observability** | OpenTelemetry + LangSmith + Prometheus + Structlog |
-| **Testing** | Pytest + `MemorySaver` (isolated, fast) |
+| **API Framework** | FastAPI + Uvicorn |
+| **Persistence** | PostgreSQL 16 (`PostgresSaver` + SQLAlchemy async) |
+| **Cache / Rate Limit** | Redis 7 |
+| **Migrations** | Alembic |
+| **Observability** | OpenTelemetry + Prometheus + structlog + LangSmith |
+| **Security** | PyJWT + SlowAPI + APIKeyHeader |
+| **Testing** | Pytest + pytest-asyncio + httpx |
 | **CI/CD** | GitHub Actions |
-| **Packaging** | `uv` + `pyproject.toml` |
+| **Packaging** | uv + `pyproject.toml` |
+| **Containerization** | Docker multi-stage + Docker Compose |
 
 ---
 
@@ -142,15 +172,18 @@ agentflow/
 │
 ├── app/
 │   ├── __init__.py                    # Version
-│   ├── main.py                        # FastAPI entrypoint
-│   ├── config.py                      # Pydantic settings
+│   ├── main.py                        # FastAPI app + middleware + handlers
+│   ├── config.py                      # Pydantic settings with validators
 │   │
-│   ├── core/                          # Graph orchestration
+│   ├── core/                          # Orchestration layer
 │   │   ├── state.py                   # Shared TypedDict state
 │   │   ├── graph.py                   # StateGraph definition
-│   │   ├── routing.py                 # Conditional edge logic
+│   │   ├── routing.py                 # Conditional edges
 │   │   ├── checkpointer.py            # PostgresSaver singleton
-│   │   └── fault_tolerance.py         # Retry + timeout policies
+│   │   ├── fault_tolerance.py         # Retry + timeout policies
+│   │   ├── exceptions.py              # Custom exception hierarchy
+│   │   ├── middleware.py              # Request ID + body limit + metrics
+│   │   └── lifespan.py                # Startup/shutdown orchestration
 │   │
 │   ├── agents/                        # Specialized agents
 │   │   ├── base.py                    # BaseAgent ABC
@@ -159,111 +192,198 @@ agentflow/
 │   │   └── reviewer.py                # Structured-output reviewer
 │   │
 │   ├── tools/                         # Agent tools
-│   │   ├── web_search.py              # Tavily search tool
-│   │   ├── code_execution.py          # Sandboxed code runner
+│   │   ├── web_search.py              # Tavily search
+│   │   ├── code_execution.py          # Sandboxed subprocess runner
 │   │   └── registry.py                # Tool registry
 │   │
 │   ├── api/                           # FastAPI layer
 │   │   ├── schemas.py                 # Request/response models
-│   │   ├── dependencies.py            # FastAPI dependencies
+│   │   ├── dependencies.py            # Shared dependencies
 │   │   ├── rate_limit.py              # SlowAPI limiter
 │   │   └── routes/
-│   │       ├── health.py              # /health, /healthz
+│   │       ├── health.py              # /health, /healthz, /readyz, /metrics
 │   │       ├── agent.py               # /v1/agent/run, /state
-│   │       └── stream.py              # /v1/agent/stream (SSE)
+│   │       ├── stream.py              # /v1/agent/stream (SSE)
+│   │       └── auth.py                # /v1/auth/token, /refresh
 │   │
-│   ├── observability/                 # Logging + traces + metrics
-│   │   ├── logging.py                 # Structlog setup
+│   ├── domain/                        # Business layer
+│   │   └── repositories/
+│   │       └── workflow_runs.py       # Audit trail repository
+│   │
+│   ├── db/                            # Database layer
+│   │   ├── engine.py                  # Async SQLAlchemy engine
+│   │   └── models.py                  # ORM models
+│   │
+│   ├── observability/                 # Logging + tracing + metrics
+│   │   ├── logging.py                 # structlog JSON
 │   │   ├── tracing.py                 # OpenTelemetry setup
-│   │   └── metrics.py                 # Prometheus counters
+│   │   └── metrics.py                 # Prometheus counters/histograms
 │   │
-│   └── security/
-│       └── auth.py                    # API key + JWT auth
+│   └── security/                      # Auth
+│       ├── auth.py                    # FastAPI dependencies
+│       └── jwt_handler.py             # Issue / verify / revoke
+│
+├── migrations/                        # Alembic
+│   ├── env.py
+│   ├── script.py.mako
+│   └── versions/0001_initial.py
 │
 ├── tests/
-│   ├── conftest.py                    # Fixtures (MemorySaver graph)
-│   ├── test_graph.py                  # Routing logic tests
-│   ├── test_nodes.py                  # Agent node tests
-│   ├── test_api.py                    # FastAPI endpoint tests
-│   └── test_fault_tolerance.py        # Retry + timeout tests
+│   ├── conftest.py
+│   ├── test_graph.py
+│   ├── test_api.py
+│   ├── test_auth.py
+│   ├── test_errors.py
+│   ├── test_nodes.py
+│   └── test_fault_tolerance.py
 │
 ├── scripts/
-│   ├── seed_db.py                     # Initialize Postgres tables
+│   ├── seed_db.py                     # Init PostgresSaver + migrations
 │   └── run_agent.py                   # CLI runner
 │
 ├── monitoring/
-│   └── prometheus.yml                 # Prometheus scrape config
+│   └── prometheus.yml                 # Scrape config
 │
 ├── .env.example                       # Environment template
 ├── .gitignore
 ├── .dockerignore
-├── Dockerfile                         # Multi-stage, non-root
-├── docker-compose.yml                 # Full stack
+├── .editorconfig
+├── Dockerfile                         # Production multi-stage
+├── Dockerfile.dev                     # Dev with hot reload
+├── docker-compose.yml                 # Production stack
+├── docker-compose.dev.yml             # Dev stack
+├── alembic.ini
 ├── langgraph.json                     # LangGraph CLI config
-├── pyproject.toml                     # Dependencies + tooling
+├── pyproject.toml                     # Deps + tooling
 ├── Makefile                           # Dev shortcuts
-└── README.md
+├── README.md
+└── LICENSE
 ```
 
 ---
 
-## Quick Start
+## Prerequisites
 
-### Prerequisites
+| Requirement | Version | Purpose |
+|---|---|---|
+| Python | 3.12+ | Runtime |
+| Docker | 24+ | Containerization |
+| Docker Compose | 2.20+ | Multi-service orchestration |
+| OpenAI API Key | — | LLM access |
+| Tavily API Key | — | Web search (optional) |
+| uv | Latest | Python package manager (recommended) |
 
-- **Python 3.12+**
-- **Docker & Docker Compose**
-- **OpenAI API key** ([get one here](https://platform.openai.com/api-keys))
-- **(Optional) Tavily API key** for web search ([get one here](https://tavily.com/))
+---
 
-### 1. Clone & Configure
+## Installation
+
+### Step 1 — Clone the Repository
 
 ```bash
 git clone https://github.com/your-org/agentflow.git
 cd agentflow
+```
+
+### Step 2 — Configure Environment
+
+```bash
 cp .env.example .env
 ```
 
-Edit `.env` and fill in your API keys:
+Edit `.env` and fill in required secrets:
 
 ```env
-OPENAI_API_KEY=sk-your-real-key
-TAVILY_API_KEY=tvly-your-real-key
-AGENTFLOW_API_KEY=change-this-to-a-strong-secret
-JWT_SECRET=change-this-too
+OPENAI_API_KEY=sk-your-real-openai-key
+TAVILY_API_KEY=tvly-your-real-tavily-key
+AGENTFLOW_API_KEY=generate-a-32-char-random-string
+JWT_SECRET=generate-a-64-char-random-string
 ```
 
-### 2. Start the Stack
+### Step 3 — Start the Stack
+
+**Production mode:**
 
 ```bash
 docker compose up --build -d
 ```
 
-This starts:
+**Development mode (hot reload):**
 
-| Service | Port | Purpose |
-|---|---|---|
-| **AgentFlow API** | `:8000` | Main API |
-| **PostgreSQL** | `:5432` | LangGraph state store |
-| **Redis** | `:6379` | Rate limiting |
-| **Jaeger UI** | `:16686` | Distributed tracing UI |
-| **Prometheus** | `:9090` | Metrics scrape + UI |
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
 
-### 3. Verify Health
+### Step 4 — Verify
 
 ```bash
 curl http://localhost:8000/health
-# → {"status":"ok","version":"3.0.0"}
+# Expected: {"status":"ok","version":"4.0.0"}
 ```
 
-### 4. Run Your First Workflow
+### Step 5 — Initialize Database
+
+```bash
+docker compose exec agentflow-api python scripts/seed_db.py
+```
+
+---
+
+## Configuration
+
+All configuration is environment-driven. See `.env.example` for full template.
+
+### Required Variables
+
+| Variable | Description | Example |
+|---|---|---|
+| `OPENAI_API_KEY` | OpenAI API key | `sk-...` |
+| `POSTGRES_URI` | PostgreSQL connection string | `postgresql://postgres:postgres@postgres:5432/agentflow` |
+| `AGENTFLOW_API_KEY` | API key for client authentication | 32+ char random string |
+| `JWT_SECRET` | JWT signing secret | 64+ char random string |
+
+### Optional Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENAI_MODEL` | `gpt-4o` | LLM model name |
+| `TAVILY_API_KEY` | `""` | Tavily search API key |
+| `REDIS_URL` | `redis://redis:6379/0` | Redis URL for rate limiting |
+| `LANGSMITH_TRACING` | `true` | Enable LangSmith traces |
+| `LANGSMITH_API_KEY` | `""` | LangSmith API key |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://jaeger:4317` | OTel collector endpoint |
+| `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated allowlist |
+| `RATE_LIMIT_DEFAULT` | `60/minute` | Global rate limit |
+| `RATE_LIMIT_RUN` | `10/minute` | Agent run rate limit |
+| `MAX_REQUEST_BYTES` | `1048576` | Request body size cap (1 MB) |
+| `MAX_REVISIONS` | `3` | Max review→code loops |
+| `NODE_TIMEOUT_SECONDS` | `60` | Per-node wall clock timeout |
+| `MAX_RETRY_ATTEMPTS` | `3` | Max retries per node |
+| `JWT_ACCESS_TTL_MINUTES` | `30` | Access token TTL |
+| `JWT_REFRESH_TTL_DAYS` | `7` | Refresh token TTL |
+| `LOG_LEVEL` | `INFO` | Log verbosity |
+| `ENVIRONMENT` | `development` | `development` / `production` |
+
+### Secret Generation
+
+```bash
+# Generate strong secrets
+python -c "import secrets; print(secrets.token_urlsafe(32))"   # API key
+python -c "import secrets; print(secrets.token_urlsafe(64))"   # JWT secret
+```
+
+---
+
+## Usage
+
+### Run a Workflow (Synchronous)
 
 ```bash
 curl -X POST http://localhost:8000/v1/agent/run \
   -H "Content-Type: application/json" \
-  -H "x-api-key: change-this-to-a-strong-secret" \
+  -H "x-api-key: your-agentflow-api-key" \
   -d '{
-    "task": "Write a Python function that validates email addresses using regex and test it with 5 examples."
+    "task": "Write a Python token bucket rate limiter and test it with 5 scenarios.",
+    "user_id": "user-123"
   }'
 ```
 
@@ -271,9 +391,9 @@ curl -X POST http://localhost:8000/v1/agent/run \
 
 ```json
 {
-  "thread_id": "a1b2c3d4-...",
+  "thread_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "status": "APPROVED",
-  "final_output": "```python\nimport re\n\ndef validate_email(email: str) -> bool:\n    ...\n```",
+  "final_output": "```python\nimport time\n\nclass TokenBucket:\n    ...\n```",
   "revisions": 1,
   "token_usage": {
     "researcher": {"input_tokens": 320, "output_tokens": 180},
@@ -282,13 +402,13 @@ curl -X POST http://localhost:8000/v1/agent/run \
 }
 ```
 
-### 5. Stream Real-Time Events (SSE)
+### Stream Events (SSE)
 
 ```bash
 curl -N -X POST http://localhost:8000/v1/agent/stream \
   -H "Content-Type: application/json" \
-  -H "x-api-key: change-this-to-a-strong-secret" \
-  -d '{"task": "Write a Python token bucket rate limiter"}'
+  -H "x-api-key: your-agentflow-api-key" \
+  -d '{"task": "Write a Python email validator"}'
 ```
 
 **Stream output:**
@@ -313,334 +433,228 @@ event: node_end
 data: {"node": "reviewer"}
 ```
 
----
-
-## Local Development
-
-If you prefer running outside Docker:
+### Inspect Thread State
 
 ```bash
-# Install dependencies (requires uv: https://docs.astral.sh/uv/)
-make install
+curl "http://localhost:8000/v1/agent/state/a1b2c3d4-e5f6-7890-abcd-ef1234567890?user_id=user-123" \
+  -H "x-api-key: your-agentflow-api-key"
+```
 
-# Start PostgreSQL and Redis only
-docker compose up -d postgres redis
+### Issue JWT Tokens
 
-# Run dev server with hot-reload
-make dev
+```bash
+curl -X POST http://localhost:8000/v1/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"subject": "user-123", "scopes": ["read", "write"]}'
+```
 
-# Run tests
-make test
+**Response:**
 
-# Lint + type-check
-make lint
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "Bearer",
+  "expires_in": 1800
+}
+```
 
-# Format code
-make format
+### Refresh Access Token
 
-# Initialize the database schema
-make seed
+```bash
+curl -X POST http://localhost:8000/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token": "your-refresh-token"}'
+```
 
-# Run the CLI agent interactively
+### CLI Runner
+
+```bash
 make run-agent
 ```
 
 ---
 
-## Configuration
+## API Reference
 
-All configuration is via environment variables. See `.env.example` for the full template.
+### Endpoints Overview
 
-### Required Variables
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/health` | None | Liveness with version |
+| `GET` | `/healthz` | None | Kubernetes liveness probe |
+| `GET` | `/readyz` | None | Readiness (Postgres + Redis ping) |
+| `GET` | `/metrics` | None | Prometheus scrape endpoint |
+| `POST` | `/v1/auth/token` | None* | Issue access + refresh tokens |
+| `POST` | `/v1/auth/refresh` | None | Refresh access token |
+| `POST` | `/v1/agent/run` | `x-api-key` | Execute workflow synchronously |
+| `POST` | `/v1/agent/stream` | `x-api-key` | Stream node events (SSE) |
+| `GET` | `/v1/agent/state/{thread_id}` | `x-api-key` | Inspect thread state |
 
-| Variable | Description | Example |
-|---|---|---|
-| `OPENAI_API_KEY` | OpenAI API key | `sk-...` |
-| `POSTGRES_URI` | PostgreSQL connection string | `postgresql://postgres:postgres@postgres:5432/agentflow` |
-| `AGENTFLOW_API_KEY` | API key clients must send in `x-api-key` header | A strong random string |
+*In production, protect `/v1/auth/token` behind your identity provider.
 
-### Optional Variables
+### POST /v1/agent/run
 
-| Variable | Default | Description |
-|---|---|---|
-| `OPENAI_MODEL` | `gpt-4o` | LLM model name |
-| `TAVILY_API_KEY` | `""` | Tavily API key for web search |
-| `REDIS_URL` | `redis://redis:6379/0` | Redis URL for rate limiting |
-| `MAX_REVISIONS` | `3` | Max review→code loops |
-| `NODE_TIMEOUT_SECONDS` | `60` | Per-node wall clock timeout |
-| `MAX_RETRY_ATTEMPTS` | `3` | Max retries per node |
-| `RATE_LIMIT_DEFAULT` | `60/minute` | Global rate limit |
-| `LOG_LEVEL` | `INFO` | Log verbosity |
-| `LANGSMITH_TRACING` | `true` | Enable LangSmith traces |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://jaeger:4317` | OTel collector endpoint |
-
-### Security Notes
-
-- **Rotate secrets in production.** Never commit `.env` to git.
-- **Use a strong `AGENTFLOW_API_KEY`** (32+ chars, random).
-- **Enable HTTPS** behind a reverse proxy (nginx / Caddy / Traefik) in production.
-- **Restrict CORS** in `app/main.py` to your known origins before going live.
-
----
-
-## API Documentation
-
-### `GET /health`
-
-Health check — no authentication required.
-
-```bash
-curl http://localhost:8000/health
-```
-
-**Response:** `200 OK`
-
-```json
-{"status": "ok", "version": "3.0.0"}
-```
-
----
-
-### `GET /healthz`
-
-Kubernetes liveness probe — no authentication required.
-
-```bash
-curl http://localhost:8000/healthz
-```
-
-**Response:** `200 OK`
-
-```json
-{"status": "ok"}
-```
-
----
-
-### `POST /v1/agent/run`
-
-Execute a full agent workflow synchronously.
-
-**Headers:**
-
-| Header | Required | Value |
-|---|---|---|
-| `Content-Type` | Yes | `application/json` |
-| `x-api-key` | Yes | Your `AGENTFLOW_API_KEY` |
-
-**Body:**
+**Request Body:**
 
 ```json
 {
-  "task": "Write a Python token bucket rate limiter and test it.",
-  "thread_id": "optional-existing-thread",
-  "user_id": "user-123"
+  "task": "string (1-4000 chars)",
+  "thread_id": "string (optional, resume existing)",
+  "user_id": "string (default: 'default')"
 }
 ```
 
-**Fields:**
+**Rate Limit:** `10/minute` per authenticated principal.
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `task` | `string` | Yes | 1–4000 characters. The business task for the agent team. |
-| `thread_id` | `string` | No | Resume an existing thread. New UUID if omitted. |
-| `user_id` | `string` | No | Tenant ID for isolation. Defaults to `"default"`. |
-
-**Response:**
+**Error Response Format:**
 
 ```json
 {
-  "thread_id": "a1b2c3d4-...",
-  "status": "APPROVED",
-  "final_output": "```python\n...final code...\n```",
-  "revisions": 1,
-  "token_usage": {
-    "researcher": {...},
-    "coder": {...}
+  "error": {
+    "code": "authentication_error",
+    "message": "Invalid or missing API key",
+    "details": {},
+    "request_id": "abc-123-def-456"
   }
 }
 ```
 
-**Rate limit:** `10/minute` per IP.
+**HTTP Status Codes:**
 
-**Errors:**
-
-| Status | Reason |
+| Code | Meaning |
 |---|---|
-| `401` | Missing or invalid `x-api-key` |
-| `422` | Validation error (missing field, too long, etc.) |
+| `200` | Success |
+| `401` | Authentication failed |
+| `413` | Payload too large |
+| `422` | Validation error |
 | `429` | Rate limit exceeded |
-| `500` | Workflow execution error |
+| `500` | Internal error |
+| `502` | Upstream (LLM/tool) failure |
+| `503` | Service unavailable |
+
+### Interactive API Docs
+
+FastAPI auto-generates interactive docs:
+
+- **Swagger UI:** `http://localhost:8000/docs`
+- **ReDoc:** `http://localhost:8000/redoc`
 
 ---
 
-### `GET /v1/agent/state/{thread_id}`
+## Security
 
-Inspect a thread's current state.
+### Authentication
 
-```bash
-curl "http://localhost:8000/v1/agent/state/a1b2c3d4?user_id=user-123" \
-  -H "x-api-key: your-key"
-```
+- **API key** (`x-api-key` header) for service-to-service calls
+- **JWT Bearer** for user-scoped access
+- **JWT revocation** via Redis JTI blacklist
+- **Short-lived access tokens** (30 min default) + refresh tokens (7 days)
 
-**Response:**
+### Application Security
 
-```json
-{
-  "values": {
-    "messages": [...],
-    "research_findings": "...",
-    "code_output": "...",
-    "review_status": "APPROVED",
-    "revision_count": 1
-  },
-  "next": []
-}
-```
+- **Strict input validation** via Pydantic
+- **Request body size cap** (1 MB default) enforced in middleware
+- **CORS allowlist** — wildcard explicitly rejected in production
+- **Rate limiting** — Redis-backed moving window, keyed per user/IP
+- **Secure error envelopes** — internal details never leak to clients
+- **Secret validation at startup** — `Settings` fails fast on weak secrets in production
 
----
+### Sandboxed Code Execution
 
-### `POST /v1/agent/stream`
+- Subprocess isolation (`python -I -S`)
+- Strict env allowlist (only `PATH` and `PYTHONIOENCODING`)
+- Hard wall-clock timeout (default 10s, configurable 1-30s)
+- Temp files cleaned up in `finally` block
 
-Stream node-level events in real time via Server-Sent Events (SSE).
+### Infrastructure Security
 
-**Headers:** Same as `/v1/agent/run`.
+- **Non-root Docker user** (`appuser`, uid 1000)
+- **Multi-stage builds** — no build tools in runtime image
+- **Health checks** on all containers
+- **No secrets in images** — all via env at runtime
+- **Graceful shutdown** — in-flight requests drained before exit
 
-**Body:** Same schema as `/v1/agent/run`.
+### Secret Rotation Checklist
 
-**Stream format:**
-
-```
-event: node_start
-data: {"node": "researcher"}
-
-event: node_end
-data: {"node": "researcher"}
-...
-```
-
-**Use case:** Perfect for UIs that show live progress: *"Researcher is working… Coder is writing… Reviewer is auditing…"*
-
----
-
-## Case Studies
-
-### Case Study 1: Autonomous API Endpoint Generation
-
-**Problem:** A fintech startup needed to scaffold dozens of REST endpoints weekly. Junior developers spent 40+ hours per week on boilerplate.
-
-**Solution:** AgentFlow pipeline:
-1. **Researcher** pulls the company's API style guide + relevant OpenAPI spec examples from docs.
-2. **Coder** generates the endpoint, DTOs, service layer, and unit tests.
-3. **Reviewer** runs a security checklist (SQL injection, auth checks, rate limits) and validates against the style guide.
-
-**Result:**
-- **~70% reduction** in boilerplate time.
-- Human engineers now review + merge rather than write from scratch.
-- Reviewer caught **3 security issues** in the first week that manual review had missed.
-
-**Sample task:**
-
-```json
-{
-  "task": "Generate a POST /api/v1/transactions endpoint that accepts {amount, currency, recipient_id}, validates them, applies idempotency via header, and writes to a Postgres table. Include OpenAPI schema and unit tests.",
-  "user_id": "fintech-team"
-}
-```
-
----
-
-### Case Study 2: Automated Data Pipeline Remediation
-
-**Problem:** A data engineering team's nightly ETL jobs failed ~3x per week due to schema drift and transient API issues. On-call engineers spent 2–4 hours per incident.
-
-**Solution:** AgentFlow as a self-healing remediation bot:
-1. **Researcher** parses the error log + source-schema diff via web-search against internal docs and vendor changelogs.
-2. **Coder** writes a patch SQL migration + updated PySpark job, then runs it in a sandboxed subprocess against a test dataset.
-3. **Reviewer** validates that row counts match expectations, no PII leakage, and idempotency is preserved.
-
-**Result:**
-- **First-touch resolution** for 8 of 10 failure categories.
-- On-call pages dropped from ~12/week to ~3/week.
-- Engineers now only handle *novel* incidents.
-
----
-
-### Case Study 3: Content Generation with Quality Gates
-
-**Problem:** A marketing team produced 200+ SEO-optimized blog posts monthly. Manual QA took ~15 minutes per post, and quality was inconsistent across writers.
-
-**Solution:** AgentFlow with a **custom Reviewer prompt** enforcing SEO best practices:
-1. **Researcher** analyzes top-ranking SERP results for the target keyword + competitor outlines.
-2. **Coder** (repurposed as "Writer") produces the draft following the outline.
-3. **Reviewer** scores against a rubric (keyword density, heading structure, readability, internal-link recommendations) and returns a pass/fail + edit suggestions.
-
-**Result:**
-- **First-draft approval rate** jumped from 40% → 82%.
-- Reviewer flagged 100% of plagiarism risks automatically.
-- Team scaled to 500 posts/month without new hires.
-
----
-
-### Case Study 4: Compliance-Aware Code Reviews
-
-**Problem:** A healthcare SaaS company needed every code change to pass HIPAA compliance checks before merge. Manual audits delayed releases by 3–5 days.
-
-**Solution:** AgentFlow as a **pre-merge compliance gate**, wired into GitHub Actions:
-1. **Researcher** retrieves the latest HIPAA audit rules + internal security policies.
-2. **Coder** (skipped in this flow) — Reviewer runs directly.
-3. **Reviewer** checks for PHI exposure, encryption-at-rest, audit logging, and access-control patterns.
-
-**Result:**
-- **Release cycle** went from 5 days → 1 day.
-- **Zero compliance violations** in 6 months post-deployment.
-- The Reviewer became the source of truth for onboarding new engineers.
+- [ ] Rotate `AGENTFLOW_API_KEY` and `JWT_SECRET` before production
+- [ ] Set `ENVIRONMENT=production` (enables strict validation)
+- [ ] Restrict `CORS_ORIGINS` to known hosts only
+- [ ] Enable HTTPS via reverse proxy
+- [ ] Run `alembic upgrade head` on every deploy
 
 ---
 
 ## Observability
 
-### Traces (Jaeger)
+### Distributed Traces (Jaeger)
 
-Every node execution and LLM call is traced via OpenTelemetry. Open `http://localhost:16686` to inspect:
+Every node execution and LLM call is traced via OpenTelemetry.
 
-- Agent node duration
-- LLM token usage per call
-- Retry attempts
-- Error paths
+**Access:** `http://localhost:16686`
 
 **Filter by:** `service.name = agentflow`
 
+**Captures:**
+
+- Node execution duration
+- LLM token usage per call
+- Retry attempts
+- Error paths with stack traces
+
 ### Metrics (Prometheus)
 
-Available at `http://localhost:9090`. Key metrics:
+**Access:** `http://localhost:9090` (Prometheus UI) · `http://localhost:8000/metrics` (raw scrape)
+
+**Key metrics:**
 
 | Metric | Type | Description |
 |---|---|---|
-| `agentflow_runs_total` | Counter | Total workflow runs, labeled by `status` |
+| `agentflow_runs_total` | Counter | Workflow runs by status |
 | `agentflow_run_duration_seconds` | Histogram | End-to-end workflow latency |
 | `agentflow_tool_calls_total` | Counter | Tool invocations by name + status |
+| `agentflow_http_requests_total` | Counter | HTTP requests by method/path/status |
+| `agentflow_http_request_duration_seconds` | Histogram | HTTP request latency |
+
+**Sample Prometheus alerts to configure:**
+
+```yaml
+- alert: HighErrorRate
+  expr: rate(agentflow_http_requests_total{status=~"5.."}[5m]) > 0.05
+  for: 5m
+
+- alert: SlowWorkflows
+  expr: histogram_quantile(0.95, agentflow_run_duration_seconds_bucket) > 120
+  for: 10m
+```
 
 ### LLM Traces (LangSmith)
 
-Set `LANGSMITH_API_KEY` in `.env` and view traces at [smith.langchain.com](https://smith.langchain.com/). You'll see:
+Set `LANGSMITH_API_KEY` in `.env` and view traces at [smith.langchain.com](https://smith.langchain.com/).
+
+**Captures:**
 
 - Full prompt/response pairs
 - Chain execution tree
 - Cost per run
+- Token usage breakdown
 
-### Logs
+### Structured Logs
 
-Structured JSON logs to stdout (via `structlog`). Ideal for `docker logs`, Loki, Datadog, or ELK.
+JSON logs to stdout via `structlog`. Ideal for `docker logs`, Loki, Datadog, or ELK.
 
-Example log line:
+**Example log line:**
 
 ```json
 {
-  "event": "node_executed",
-  "node": "coder",
+  "event": "http_request",
+  "method": "POST",
+  "path": "/v1/agent/run",
+  "status": 200,
+  "duration_ms": 8421.33,
+  "request_id": "abc-123-def-456",
   "level": "info",
-  "timestamp": "2026-11-10T12:34:56.789Z"
+  "timestamp": "2026-11-14T12:34:56.789Z"
 }
 ```
 
@@ -648,34 +662,146 @@ Example log line:
 
 ## Testing
 
+### Run All Tests
+
 ```bash
-# Full suite with coverage
 make test
-
-# Only graph tests
-uv run pytest tests/test_graph.py -v
-
-# Only fault tolerance
-uv run pytest tests/test_fault_tolerance.py -v
 ```
 
-**Coverage highlights:**
+### Individual Test Suites
 
-- ✅ Graph routing logic (`should_revise`) across all branches
-- ✅ Reviewer structured output parsing
-- ✅ API authentication (missing / invalid / valid key)
-- ✅ Retry recovery after transient failures
-- ✅ Timeout enforcement per node
+```bash
+# Graph routing logic
+uv run pytest tests/test_graph.py -v
 
-**Isolated testing:** Tests use `MemorySaver` instead of PostgreSQL, so they run in <5s with no external dependencies.
+# API endpoints + auth
+uv run pytest tests/test_api.py -v
+
+# JWT issue / verify / revoke
+uv run pytest tests/test_auth.py -v
+
+# Fault tolerance (retry + timeout)
+uv run pytest tests/test_fault_tolerance.py -v
+
+# Error envelope format
+uv run pytest tests/test_errors.py -v
+```
+
+### Coverage
+
+```bash
+uv run pytest --cov=app --cov-report=html
+open htmlcov/index.html
+```
+
+### Test Strategy
+
+- **Unit tests** use `MemorySaver` (no Postgres required)
+- **Integration tests** (API) use `httpx.AsyncClient` + `ASGITransport`
+- **Fault tolerance tests** simulate transient failures + timeouts
+- **Auth tests** verify JWT lifecycle + revocation
+- **Error tests** validate the envelope format
+
+All tests run in under 10 seconds with no external dependencies.
 
 ---
 
-## Deployment
+## Docker Deployment
 
-### Option 1: LangSmith Cloud (Recommended for Teams)
+### Full Stack Commands
 
-Fastest path to production. No infra management, auto-scales, built-in observability.
+```bash
+# Build images
+docker compose build
+
+# Start all services (detached)
+docker compose up -d
+
+# Check status
+docker compose ps
+
+# Follow logs
+docker compose logs -f
+
+# Follow logs for a specific service
+docker compose logs -f agentflow-api
+
+# Stop and remove containers
+docker compose down
+
+# Stop and remove volumes (destroys data)
+docker compose down -v
+```
+
+### Service Ports
+
+| Service | Port | Purpose |
+|---|---|---|
+| AgentFlow API | `8000` | Main API |
+| PostgreSQL | `5432` | Database |
+| Redis | `6379` | Rate limiting |
+| Jaeger UI | `16686` | Tracing UI |
+| Jaeger OTLP | `4317` | Trace collection |
+| Prometheus | `9090` | Metrics UI |
+
+### Rebuild After Code Changes
+
+```bash
+# Fast rebuild (reuses cache)
+docker compose up --build -d agentflow-api
+
+# Full rebuild (no cache)
+docker compose build --no-cache agentflow-api
+docker compose up -d agentflow-api
+```
+
+### Run Migrations
+
+```bash
+docker compose exec agentflow-api alembic upgrade head
+```
+
+### Inspect Container Errors
+
+```bash
+# View last 200 log lines
+docker compose logs --tail=200 agentflow-api
+
+# Shell into the container
+docker compose exec agentflow-api /bin/bash
+
+# Check health status
+docker compose ps
+```
+
+### Clean Up Unused Resources
+
+```bash
+# Remove stopped containers + unused networks
+docker system prune -f
+
+# Also remove unused images
+docker system prune -a -f
+
+# Also remove volumes (DESTROYS DATA)
+docker system prune -a -f --volumes
+```
+
+### Development Stack (Hot Reload)
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+The `app/` directory is mounted as a volume, so code changes trigger auto-reload.
+
+---
+
+## Production Deployment
+
+### Option 1 — LangSmith Cloud (Recommended)
+
+Fully managed, auto-scaling, built-in observability.
 
 ```bash
 pip install -U "langgraph-cli[inmem]"
@@ -689,22 +815,24 @@ Set these secrets in your LangSmith dashboard:
 - `OPENAI_API_KEY`
 - `POSTGRES_URI`
 - `TAVILY_API_KEY`
+- `AGENTFLOW_API_KEY`
+- `JWT_SECRET`
 
-### Option 2: Docker (Self-Hosted)
+### Option 2 — Self-Hosted Docker
 
 ```bash
 docker compose up --build -d
 ```
 
-For production, add:
+Add in front:
 
-- A reverse proxy (nginx / Caddy) for HTTPS
-- `restart: unless-stopped` (already in compose)
-- Log aggregation to Loki / CloudWatch / Datadog
+- **Reverse proxy** (nginx / Caddy / Traefik) for HTTPS + TLS termination
+- **Log aggregation** (Loki / CloudWatch / Datadog)
+- **Postgres backups** (daily snapshots)
 
-### Option 3: Kubernetes
+### Option 3 — Kubernetes
 
-The official LangSmith Helm chart supports independent queue-based autoscaling, graceful draining, and multi-replica deployments with a shared Postgres backend.
+Use the LangSmith Helm chart:
 
 ```bash
 helm repo add langchain https://langchain-ai.github.io/helm/
@@ -715,14 +843,19 @@ helm install agentflow langchain/langgraph-cloud \
 
 ### Production Checklist
 
-- [ ] Rotate `AGENTFLOW_API_KEY` and `JWT_SECRET` from defaults
-- [ ] Enable HTTPS (reverse proxy)
-- [ ] Lock down CORS in `app/main.py`
+- [ ] Set `ENVIRONMENT=production`
+- [ ] Rotate `AGENTFLOW_API_KEY` and `JWT_SECRET`
+- [ ] Restrict `CORS_ORIGINS` to known origins
+- [ ] Enable HTTPS (reverse proxy + valid certificates)
 - [ ] Set `LOG_LEVEL=WARNING` to reduce noise
-- [ ] Configure log aggregation
-- [ ] Set up Prometheus alerts on `agentflow_runs_total{status="error"}`
-- [ ] Verify Postgres backups are enabled
-- [ ] Set `LANGSMITH_TRACING=true` for LLM-level debugging
+- [ ] Configure log aggregation pipeline
+- [ ] Set up Prometheus alerts on error rate + latency
+- [ ] Verify Postgres backups + point-in-time recovery
+- [ ] Enable `LANGSMITH_TRACING=true` for LLM debugging
+- [ ] Run `alembic upgrade head` on deploy
+- [ ] Gate `/v1/auth/token` behind your IdP or remove in production
+- [ ] Configure resource limits in Docker Compose / K8s
+- [ ] Set up uptime monitoring on `/healthz`
 
 ---
 
@@ -730,9 +863,9 @@ helm install agentflow langchain/langgraph-cloud \
 
 ### `docker compose up` fails on `agentflow-api`
 
-**Cause:** Postgres not ready yet.
+**Cause:** Postgres not ready.
 
-**Fix:** Compose already uses `condition: service_healthy` — but if it still fails:
+**Fix:**
 
 ```bash
 docker compose down -v
@@ -741,15 +874,15 @@ docker compose up --build
 
 ### `psycopg.OperationalError: connection refused`
 
-**Cause:** `POSTGRES_URI` uses `localhost` instead of `postgres` (the Docker service name).
+**Cause:** `POSTGRES_URI` uses `localhost` instead of `postgres` (Docker service name).
 
-**Fix:** Inside Docker, use the service name:
+**Fix:** Inside Docker:
 
 ```env
 POSTGRES_URI=postgresql://postgres:postgres@postgres:5432/agentflow
 ```
 
-Outside Docker (local dev), use `localhost`:
+Outside Docker (local dev):
 
 ```env
 POSTGRES_URI=postgresql://postgres:postgres@localhost:5432/agentflow
@@ -757,7 +890,7 @@ POSTGRES_URI=postgresql://postgres:postgres@localhost:5432/agentflow
 
 ### `401 Unauthorized` from `/v1/agent/run`
 
-**Cause:** Missing or wrong `x-api-key` header.
+**Cause:** Missing or wrong `x-api-key`.
 
 **Fix:**
 
@@ -765,25 +898,31 @@ POSTGRES_URI=postgresql://postgres:postgres@localhost:5432/agentflow
 curl -H "x-api-key: $(grep AGENTFLOW_API_KEY .env | cut -d= -f2)" ...
 ```
 
+### `413 Payload Too Large`
+
+**Cause:** Request body exceeds `MAX_REQUEST_BYTES` (default 1 MB).
+
+**Fix:** Either reduce the payload or increase `MAX_REQUEST_BYTES` in `.env`.
+
 ### `429 Too Many Requests`
 
-**Cause:** Rate limit hit (default `10/minute` for `/run`, `60/minute` globally).
+**Cause:** Rate limit hit (`10/minute` for `/v1/agent/run`, `60/minute` globally).
 
-**Fix:** Adjust `RATE_LIMIT_DEFAULT` in `.env` or wait for the window to reset (Redis-backed).
+**Fix:** Adjust `RATE_LIMIT_DEFAULT` / `RATE_LIMIT_RUN` in `.env`, or wait for the window to reset.
 
 ### Reviewer always returns `NEEDS_REVISION`
 
-**Cause:** Task is too vague, or the coder is looping on a bug the LLM can't spot.
+**Cause:** Task too vague, or the coder is stuck on a bug.
 
 **Fix:**
 
-- Make the `task` more specific (mention language, framework, constraints).
-- Inspect intermediate state: `GET /v1/agent/state/{thread_id}`.
-- Set `MAX_REVISIONS=1` to fail faster in dev.
+- Make the `task` more specific
+- Inspect intermediate state: `GET /v1/agent/state/{thread_id}`
+- Set `MAX_REVISIONS=1` in dev to fail faster
 
-### `ModuleNotFoundError` inside the container
+### `ModuleNotFoundError` inside container
 
-**Cause:** A new dependency wasn't added to `pyproject.toml`.
+**Cause:** New dependency missing from `pyproject.toml`.
 
 **Fix:**
 
@@ -795,7 +934,7 @@ docker compose up -d agentflow-api
 
 ### LangGraph checkpoint tables missing
 
-**Cause:** `PostgresSaver.setup()` hasn't been run.
+**Cause:** `PostgresSaver.setup()` hasn't run.
 
 **Fix:**
 
@@ -803,59 +942,108 @@ docker compose up -d agentflow-api
 docker compose exec agentflow-api python scripts/seed_db.py
 ```
 
+### Alembic migration fails
+
+**Cause:** `POSTGRES_URI` points to wrong DB or DB not ready.
+
+**Fix:**
+
+```bash
+docker compose exec postgres pg_isready -U postgres
+docker compose exec agentflow-api alembic current
+docker compose exec agentflow-api alembic upgrade head
+```
+
+### `/readyz` returns `degraded`
+
+**Cause:** One or more dependencies (Postgres or Redis) unreachable.
+
+**Fix:** Check the `checks` object in the response:
+
+```bash
+curl http://localhost:8000/readyz | jq
+```
+
 ---
 
 ## Contributing
 
-Contributions are welcome! Here's how:
+Contributions welcome! Follow these steps:
 
-1. **Fork** the repo and create a feature branch:
-   ```bash
-   git checkout -b feat/your-feature-name
-   ```
-2. **Install dev dependencies:**
-   ```bash
-   make install
-   ```
-3. **Write your change** with tests.
-4. **Run the full suite:**
-   ```bash
-   make lint && make test
-   ```
-5. **Commit** using [Conventional Commits](https://www.conventionalcommits.org/):
-   ```
-   feat(agents): add a DataAnalyst agent
-   ```
-6. **Open a PR.** CI must pass before review.
+### 1. Fork and Branch
+
+```bash
+git checkout -b feat/your-feature-name
+```
+
+### 2. Install Dev Dependencies
+
+```bash
+make install
+```
+
+### 3. Make Changes
+
+Write code + tests. Ensure tests pass:
+
+```bash
+make lint
+make test
+```
+
+### 4. Commit (Conventional Commits)
+
+```
+feat(agents): add a DataAnalyst agent
+fix(routing): handle empty feedback
+docs(readme): add Kubernetes example
+```
+
+### 5. Open a Pull Request
+
+CI must pass before review. Include tests for new features.
 
 ### Code Style
 
-- **Line length:** 100 (enforced by `ruff`)
-- **Types:** `mypy --strict`
-- **Tests:** Every new feature needs a test file or test case
+| Rule | Standard |
+|---|---|
+| Line length | 100 chars |
+| Type checking | `mypy --strict` |
+| Formatting | `ruff format` |
+| Linting | `ruff check` |
+| Tests | Every feature needs tests |
 
-### Project Ideas for Contributors
+### Ideas for Contributors
 
-- **Human-in-the-Loop**: Implement `interrupt()` before Coder for manual approval
-- **Sub-agents**: Parallel researcher agents for faster info gathering
-- **Long-term memory**: Mem0 / Qdrant integration for cross-session learning
-- **Multi-language**: Add a Translator agent for i18n content pipelines
-- **Cost budgets**: Per-thread token caps and alerts
-- **Custom evaluators**: Automated quality scoring using LangSmith datasets
-
----
-
-## License
-
-MIT License — see [LICENSE](LICENSE) for details.
-
-**TL;DR:** Free for personal and commercial use. Just don't remove the copyright notice.
+- **Human-in-the-loop** — `interrupt()` before Coder for manual approval
+- **Sub-agents** — Parallel researcher agents for faster info gathering
+- **Long-term memory** — Mem0 / Qdrant integration for cross-session learning
+- **Multi-language** — Translator agent for i18n pipelines
+- **Cost budgets** — Per-thread token caps with alerts
+- **Custom evaluators** — Automated quality scoring with LangSmith datasets
+- **OpenAPI SDK** — Auto-generated TypeScript/Python clients
 
 ---
 
 ## Acknowledgments
 
-- **[LangGraph](https://github.com/langchain-ai/langgraph)** — the stateful multi-agent orchestration engine that makes this possible
-- **[LangSmith](https://smith.langchain.com/)** — production tracing for LLM apps
-- **[DeerFlow](https://github.com/bytedance/deer-flow)** and **[AgentFlow](https://github.com/lupantech/AgentFlow)** — design patterns that inspired this architecture
-- **[SlowAPI](https://github.com/laurentS/slowapi)** — the simplest rate limiter that just works
+- [LangGraph](https://github.com/langchain-ai/langgraph) — stateful multi-agent orchestration
+- [LangSmith](https://smith.langchain.com/) — production LLM tracing
+- [FastAPI](https://fastapi.tiangolo.com/) — modern async web framework
+- [SlowAPI](https://github.com/laurentS/slowapi) — simple rate limiting
+- [OpenTelemetry](https://opentelemetry.io/) — vendor-neutral observability
+- [structlog](https://www.structlog.org/) — structured logging
+
+---
+
+## License
+
+Distributed under the **MIT License**. See [LICENSE](LICENSE) for full text.
+
+**TL;DR:** Free for personal and commercial use. Keep the copyright notice.
+
+
+
+<sub>If AgentFlow saved you time, consider giving it a <a href="https://github.com/your-org/agentflow">star</a>.</sub>
+
+</div>
