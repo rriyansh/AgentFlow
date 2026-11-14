@@ -1,4 +1,6 @@
+"""Tavily-backed web search tool."""
 import os
+
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from tavily import TavilyClient
@@ -7,13 +9,13 @@ _tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY", ""))
 
 
 class WebSearchInput(BaseModel):
-    query: str = Field(description="The search query")
-    max_results: int = Field(default=5, ge=1, le=10, description="Number of results")
+    query: str = Field(description="Search query")
+    max_results: int = Field(default=5, ge=1, le=10)
 
 
 @tool("web_search", args_schema=WebSearchInput)
 def web_search(query: str, max_results: int = 5) -> str:
-    """Search the web for current information. Use for research tasks."""
+    """Search the web for current information."""
     try:
         results = _tavily.search(query=query, max_results=max_results)
         if not results.get("results"):
