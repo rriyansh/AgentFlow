@@ -1,9 +1,10 @@
+"""Retry, timeout, and fallback policies."""
 from langgraph.types import RetryPolicy, TimeoutPolicy
+
 from app.config import settings
 
 
 def get_retry_policy() -> RetryPolicy:
-    """Exponential backoff with jitter for transient failures."""
     return RetryPolicy(
         initial_interval=1.0,
         backoff_factor=2.0,
@@ -14,7 +15,6 @@ def get_retry_policy() -> RetryPolicy:
 
 
 def get_timeout_policy() -> TimeoutPolicy:
-    """Hard wall-clock cap per node attempt."""
     return TimeoutPolicy(
         run_timeout=settings.node_timeout_seconds,
         idle_timeout=settings.node_timeout_seconds // 2,
@@ -22,10 +22,6 @@ def get_timeout_policy() -> TimeoutPolicy:
 
 
 def handle_node_failure(state: dict, error: Exception) -> dict:
-    """
-    Fallback handler: runs only after all retries are exhausted.
-    Records failure and gracefully routes to END.
-    """
     return {
         "review_status": "ERROR",
         "review_feedback": f"Node failed after retries: {error!s}",
