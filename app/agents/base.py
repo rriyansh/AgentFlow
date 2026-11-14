@@ -1,12 +1,13 @@
+"""Base agent with shared LLM configuration."""
 from abc import ABC, abstractmethod
 from typing import Any
+
 from langchain_openai import ChatOpenAI
+
 from app.config import settings
 
 
 class BaseAgent(ABC):
-    """Base class for all specialized agents."""
-
     def __init__(self, temperature: float = 0.0) -> None:
         self.llm = ChatOpenAI(
             model=settings.openai_model,
@@ -18,5 +19,4 @@ class BaseAgent(ABC):
 
     @abstractmethod
     def run(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Execute agent logic and return state updates."""
         ...
