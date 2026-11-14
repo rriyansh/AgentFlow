@@ -1,23 +1,21 @@
+"""Server-Sent Events streaming endpoint."""
 import json
+
 from fastapi import APIRouter, Depends
-from sse_starlette.sse import EventSourceResponse
 from langchain_core.messages import HumanMessage
+from sse_starlette.sse import EventSourceResponse
+
 from app.api.schemas import RunRequest
-from app.security.auth import verify_api_key
 from app.core.graph import app as agent_app
+from app.security.auth import verify_api_key
 
 router = APIRouter(prefix="/v1/agent", tags=["stream"])
 
 
-@router.post("/stream")
-async def stream_agent(
-    payload: RunRequest, _: str = Depends(verify_api_key)
-):
-    """Stream node-level events via Server-Sent Events."""
+@router.post("/stream", dependencies=[Depends(verify_api_key)])
+async def stream_agent(payload: RunRequest):
     thread_id = payload.thread_id or "stream-session"
-    config = {
-        "configurable": {"thread_id": f"{payload.user_id}:{thread_id}"}
-    }
+    config = {"configurable": {"thread_id": f"{payload.user_id}:{thread_id}"}}
 
     initial_state = {
         "messages": [HumanMessage(content=payload.task)],
@@ -37,19 +35,11 @@ async def stream_agent(
         ):
             kind = event["event"]
             name = event.get("name", "")
-            if kind == "on_chain_start" and name in (
-                "researcher", "coder", "reviewer"
-            ):
-                yield {
-                    "event": "node_start",
-                    "data": json.dumps({"node": name}),
-                }
-            elif kind == "on_chain_end" and name in (
-                "researcher", "coder", "reviewer"
-            ):
-                yield {
-                    "event": "node_end",
-                    "data": json.dumps({"node": name}),
-                }
+            if name not in ("researcher", "coder", "reviewer"):
+                continue
+            if kind == "on_chain_start":
+                yield {"event": "node_start", "data": json.dumps({"node": name})}
+            elif kind == "on_chain_end":
+                yield {"event": "node_end", "data": json.dumps({"node": name})}
 
     return EventSourceResponse(event_generator())
