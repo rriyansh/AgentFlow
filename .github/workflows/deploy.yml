@@ -1,26 +1,18 @@
 name: Deploy
-
 on:
-  push:
-    branches: [main]
-    tags: ["v*"]
+  push: {branches: [main], tags: ["v*"]}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install LangGraph CLI
-        run: pip install -U "langgraph-cli[inmem]"
-
-      - name: Deploy to LangSmith
+      - run: pip install -U "langgraph-cli[inmem]"
+      - run: |
+          langgraph deploy \
+            --agent-id agentflow \
+            --agent-environment production
         env:
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           POSTGRES_URI: ${{ secrets.POSTGRES_URI }}
-        run: |
-          langgraph deploy \
-            --agent-id agentflow \
-            --agent-environment production
