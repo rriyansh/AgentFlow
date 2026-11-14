@@ -1,55 +1,40 @@
+import time
+
 import pytest
-from langgraph.graph import StateGraph, END
-from langgraph.types import RetryPolicy
+from langgraph.graph import END, StateGraph
+from langgraph.types import RetryPolicy, TimeoutPolicy
 
 
 @pytest.mark.asyncio
-async def test_retry_on_transient_failure():
-    """Node fails twice then succeeds; retry policy should recover."""
-    call_count = {"n": 0}
+async def test_retry_recovers_transient_failure():
+    count = {"n": 0}
 
-    def flaky_node(state):
-        call_count["n"] += 1
-        if call_count["n"] < 3:
-            raise ConnectionError("Transient network error")
-        return {"code_output": "success"}
+    def flaky(state):
+        count["n"] += 1
+        if count["n"] < 3:
+            raise ConnectionError("transient")
+        return {"ok": True}
 
-    workflow = StateGraph(dict)
-    workflow.add_node(
-        "flaky",
-        flaky_node,
-        retry_policy=RetryPolicy(
-            max_attempts=3, initial_interval=0.1
-        ),
-    )
-    workflow.set_entry_point("flaky")
-    workflow.add_edge("flaky", END)
-    graph = workflow.compile()
-
-    result = await graph.ainvoke({"code_output": ""})
-    assert result["code_output"] == "success"
-    assert call_count["n"] == 3
+    wf = StateGraph(dict)
+    wf.add_node("f", flaky, retry_policy=RetryPolicy(max_attempts=3, initial_interval=0.05))
+    wf.set_entry_point("f")
+    wf.add_edge("f", END)
+    g = wf.compile()
+    result = await g.ainvoke({})
+    assert result["ok"] is True
+    assert count["n"] == 3
 
 
 @pytest.mark.asyncio
-async def test_timeout_enforcement():
-    """Node exceeding timeout should raise NodeTimeoutError."""
-    import time
-    from langgraph.types import TimeoutPolicy
+async def test_timeout_enforced():
+    def slow(state):
+        time.sleep(3)
+        return {"ok": True}
 
-    def slow_node(state):
-        time.sleep(5)
-        return {"code_output": "done"}
-
-    workflow = StateGraph(dict)
-    workflow.add_node(
-        "slow",
-        slow_node,
-        timeout=TimeoutPolicy(run_timeout=0.5),
-    )
-    workflow.set_entry_point("slow")
-    workflow.add_edge("slow", END)
-    graph = workflow.compile()
-
+    wf = StateGraph(dict)
+    wf.add_node("s", slow, timeout=TimeoutPolicy(run_timeout=0.5))
+    wf.set_entry_point("s")
+    wf.add_edge("s", END)
+    g = wf.compile()
     with pytest.raises(Exception):
-        await graph.ainvoke({"code_output": ""})
+        await g.ainvoke({})
