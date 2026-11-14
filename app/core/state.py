@@ -1,11 +1,12 @@
+"""Shared graph state and structured output models."""
 import operator
-from typing import TypedDict, Annotated, Sequence
-from pydantic import BaseModel, Field
+from typing import Annotated, Sequence, TypedDict
+
 from langchain_core.messages import BaseMessage
+from pydantic import BaseModel, Field
 
 
 class AgentFlowState(TypedDict):
-    """Shared memory flowing through every node in the graph."""
     messages: Annotated[Sequence[BaseMessage], operator.add]
     research_findings: str
     code_output: str
@@ -18,6 +19,5 @@ class AgentFlowState(TypedDict):
 
 
 class ReviewDecision(BaseModel):
-    """Structured output from the Reviewer agent."""
     status: str = Field(description="Either APPROVED or NEEDS_REVISION")
     feedback: str = Field(description="Specific, actionable feedback")
