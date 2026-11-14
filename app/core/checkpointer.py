@@ -1,5 +1,7 @@
-from psycopg_pool import ConnectionPool
+"""PostgresSaver singleton with connection pooling."""
 from langgraph.checkpoint.postgres import PostgresSaver
+from psycopg_pool import ConnectionPool
+
 from app.config import settings
 
 _pool: ConnectionPool | None = None
@@ -7,7 +9,6 @@ _checkpointer: PostgresSaver | None = None
 
 
 def get_checkpointer() -> PostgresSaver:
-    """Singleton PostgresSaver with connection pooling for durable execution."""
     global _pool, _checkpointer
     if _checkpointer is None:
         _pool = ConnectionPool(
@@ -15,6 +16,7 @@ def get_checkpointer() -> PostgresSaver:
             min_size=settings.db_pool_min_size,
             max_size=settings.db_pool_max_size,
             timeout=30,
+            open=True,
         )
         _checkpointer = PostgresSaver(_pool)
         _checkpointer.setup()
