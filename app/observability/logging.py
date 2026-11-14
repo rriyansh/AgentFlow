@@ -1,12 +1,13 @@
+"""Structured JSON logging via structlog."""
 import logging
+
 import structlog
+
 from app.config import settings
 
 
 def setup_logging() -> None:
-    logging.basicConfig(
-        level=settings.log_level.upper(), format="%(message)s"
-    )
+    logging.basicConfig(level=settings.log_level.upper(), format="%(message)s")
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
