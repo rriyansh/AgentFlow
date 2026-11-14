@@ -1,1 +1,1 @@
-"""Observability: logging, tracing, and metrics."""
+"""Observability primitives."""
