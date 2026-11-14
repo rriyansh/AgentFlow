@@ -1,8 +1,16 @@
-from fastapi import Header, HTTPException
-from app.config import settings
+"""Shared FastAPI dependencies."""
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.engine import get_session
+from app.domain.repositories.workflow_runs import WorkflowRunRepository
+from app.security.auth import verify_api_key, verify_jwt
 
 
-async def verify_api_key(x_api_key: str = Header(...)) -> str:
-    if x_api_key != settings.agentflow_api_key:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-    return x_api_key
+async def get_workflow_repo(
+    session: AsyncSession = Depends(get_session),
+) -> WorkflowRunRepository:
+    return WorkflowRunRepository(session)
+
+
+__all__ = ["verify_api_key", "verify_jwt", "get_workflow_repo"]
